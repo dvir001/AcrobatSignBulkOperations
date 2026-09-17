@@ -90,13 +90,17 @@ jobs:
           Copy-Item src/main/resources/application.yml dist/application.yml
           if (-not (Get-ChildItem dist -Filter '*.exe')) { throw 'Installer was not created.' }
 
+      - name: Create release ZIP
+        run: |
+          Compress-Archive -Path dist/*.exe, dist/application.yml `
+            -DestinationPath "dist/AcrobatSignBulkOperations-$env:RELEASE_VERSION-windows-x64.zip" `
+            -ErrorAction Stop
+
       - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-release
-          path: |
-            dist/*.exe
-            dist/application.yml
+          path: dist/*.zip
           if-no-files-found: error
           retention-days: 7
 
@@ -120,7 +124,7 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
-          gh release create "v${RELEASE_VERSION}" dist/*.exe dist/application.yml \
+          gh release create "v${RELEASE_VERSION}" dist/*.zip \
             --target "$RELEASE_COMMIT" \
             --title "Acrobat Sign Bulk Operations ${RELEASE_VERSION}" \
-            --notes "Windows x64 installer with a bundled Java runtime. Download application.yml, configure your integration key and baseUrl, and launch the installed executable from that configuration folder. See the README at this release tag for full instructions. The installer is unsigned."
+            --notes "Download and extract the Windows x64 ZIP containing the installer with a bundled Java runtime and application.yml. Run the installer, configure your integration key and baseUrl in the extracted application.yml, and launch the installed executable from that configuration folder. See the README at this release tag for full instructions. The installer is unsigned."
