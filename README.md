@@ -103,6 +103,31 @@ The delete operation is available to delete the documents associated with agreem
   </li>
   </ul>
 
+## Windows EXE releases
+
+Maintainers can open **Actions → Windows EXE release → Run workflow**, select the
+branch to build, and enter a new version such as `1.0.0` (without a `v` prefix).
+The workflow runs the Maven tests, builds on Windows x64, and publishes a GitHub
+release tagged `v1.0.0` at the selected commit with an `.exe` installer and a
+credential-free `application.yml` template. Use a new version for each release;
+existing releases are not overwritten. Windows version limits are `255.255.65535`.
+The workflow must be on the default branch for the **Run workflow** button to appear.
+
+To run a release:
+
+1. Download and run the `.exe` installer from **Releases**. It includes Java, so
+   a separate Java installation is not required. The installer is unsigned and
+   Windows may display a security warning.
+2. Download the release's `application.yml` into a writable working folder.
+   Update `integration-key`, `baseUrl`, and any filters as described above.
+   Keep this file private; do not upload your integration key.
+3. Open Command Prompt in that working folder and run the installed launcher,
+   using its full path: `"<installation-folder>\AcrobatSignBulkOperations.exe"`.
+   The application reads `application.yml` from the working folder and writes
+   relative output paths there. Do not launch from a protected system directory.
+4. Keep the console open and visit http://localhost:8090/. The packaged application
+   listens only on the local machine by default. Press Ctrl+C in the console to stop it.
+
 # Instructions on how to run the code (For developers)
 ## Prerequisites
 For the building of this project, the client machine should have the following software installed:

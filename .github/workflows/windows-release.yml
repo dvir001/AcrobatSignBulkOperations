@@ -1,0 +1,126 @@
+name: Windows EXE release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (major.minor.patch, for example 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Validate installer version
+        run: |
+          if ($env:RELEASE_VERSION -cnotmatch '\A(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})\z') {
+            throw 'Version must be major.minor.patch with no leading zeros.'
+          }
+          $parts = $env:RELEASE_VERSION.Split('.')
+          if ([int]$parts[0] -gt 255 -or [int]$parts[1] -gt 255 -or [int]$parts[2] -gt 65535) {
+            throw 'Windows installer version limits are 255.255.65535.'
+          }
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java for the Maven build
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Test and build executable JAR
+        env:
+          SPRING_CONFIG_LOCATION: classpath:/application.yml
+        run: |
+          mvn --batch-mode --no-transfer-progress clean verify spring-boot:repackage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Set up Java for Windows packaging
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Test on the bundled Java version
+        env:
+          SPRING_CONFIG_LOCATION: classpath:/application.yml
+        run: |
+          mvn --batch-mode --no-transfer-progress surefire:test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package Windows installer with bundled runtime
+        run: |
+          if ($env:WIX) { $env:Path += ";$env:WIX\bin" }
+          Get-Command candle.exe, light.exe -ErrorAction Stop
+          New-Item -ItemType Directory -Path package-input, dist | Out-Null
+          $jars = @(Get-ChildItem target -Filter '*.jar')
+          if ($jars.Count -ne 1) { throw 'Expected exactly one application JAR.' }
+          Copy-Item $jars[0].FullName package-input/application.jar
+          jpackage --type exe `
+            --name AcrobatSignBulkOperations `
+            --app-version "$env:RELEASE_VERSION" `
+            --input package-input `
+            --main-jar application.jar `
+            --main-class org.springframework.boot.loader.JarLauncher `
+            --dest dist `
+            --java-options '-Dserver.address=127.0.0.1' `
+            --win-console `
+            --win-per-user-install `
+            --win-dir-chooser `
+            --win-upgrade-uuid 89d18a35-44ea-4cbb-b969-ac5a6a7641be
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Only distribute the blank-key template, never the root configuration or output data.
+          Copy-Item src/main/resources/application.yml dist/application.yml
+          if (-not (Get-ChildItem dist -Filter '*.exe')) { throw 'Installer was not created.' }
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-release
+          path: |
+            dist/*.exe
+            dist/application.yml
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-release
+          path: dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          gh release create "v${RELEASE_VERSION}" dist/*.exe dist/application.yml \
+            --target "$RELEASE_COMMIT" \
+            --title "Acrobat Sign Bulk Operations ${RELEASE_VERSION}" \
+            --notes "Windows x64 installer with a bundled Java runtime. Download application.yml, configure your integration key and baseUrl, and launch the installed executable from that configuration folder. See the README at this release tag for full instructions. The installer is unsigned."
