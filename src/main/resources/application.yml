@@ -1,8 +1,13 @@
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: 8090
 
 
 spring:
+  security:
+    user:
+      name: ${APP_USERNAME:operator}
+      password: ${APP_PASSWORD:}
   servlet:
     multipart:
       enabled: true

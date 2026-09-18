@@ -1,11 +1,6 @@
 package com.adobe.acrobatsign.service;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipOutputStream;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -558,20 +553,12 @@ public class AdobeSignService {
 	 * @return the string
 	 */
 	public String sendAgreement(org.json.JSONArray jsonArray, MultipartFile file1) {
-		final String filePathStr = "output/";
-		final String fileName = file1.getOriginalFilename();
-
 		String accessToken = null;
 		String agreementId = null;
-		try {
-			final Path filepath = Paths.get(filePathStr, fileName);
-			try (OutputStream os = Files.newOutputStream(filepath)) {
-				os.write(file1.getBytes());
-			}
-			final File file = new File(filePathStr + fileName);
+		try (UploadedDocument document = UploadedDocument.store(file1)) {
 			accessToken = Constants.BEARER + getIntegrationKey();
 			final JSONObject uploadDocumentResponse = restApiAgreements.postTransientDocument(accessToken, MIME_TYPE,
-					file.getAbsolutePath(), fileName);
+					document.getPath().toString(), "document.pdf");
 			final String transientDocumentId = (String) uploadDocumentResponse
 					.get(DocumentIdentifierName.TRANSIENT_DOCUMENT_ID.toString());
 
@@ -600,20 +587,12 @@ public class AdobeSignService {
 	 * @return the string
 	 */
 	public String sendContract(SendAgreementVO sendAgreementVO, MultipartFile file1) {
-		final String filePathStr = "output/";
-		final String fileName = file1.getOriginalFilename();
-
 		String accessToken = null;
 		String agreementId = null;
-		try {
-			final Path filepath = Paths.get(filePathStr, fileName);
-			try (OutputStream os = Files.newOutputStream(filepath)) {
-				os.write(file1.getBytes());
-			}
-			final File file = new File(filePathStr + fileName);
+		try (UploadedDocument document = UploadedDocument.store(file1)) {
 			accessToken = Constants.BEARER + getIntegrationKey();
 			final JSONObject uploadDocumentResponse = restApiAgreements.postTransientDocument(accessToken, MIME_TYPE,
-					file.getAbsolutePath(), fileName);
+					document.getPath().toString(), "document.pdf");
 			final String transientDocumentId = (String) uploadDocumentResponse
 					.get(DocumentIdentifierName.TRANSIENT_DOCUMENT_ID.toString());
 

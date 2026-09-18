@@ -18,7 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 90
     defaults:
       run:
         shell: pwsh
@@ -43,27 +43,38 @@ jobs:
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '8'
-
-      - name: Test and build executable JAR
-        env:
-          SPRING_CONFIG_LOCATION: classpath:/application.yml
-        run: |
-          mvn --batch-mode --no-transfer-progress clean verify spring-boot:repackage
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Set up Java for Windows packaging
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
           java-version: '17'
 
-      - name: Test on the bundled Java version
+      - name: Require vulnerability database credentials
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NVD_API_KEY)) {
+            throw 'Configure the NVD_API_KEY repository secret; releases require a successful vulnerability scan.'
+          }
+
+      - name: Rebuild, test, inventory, and scan all resolved dependencies
         env:
           SPRING_CONFIG_LOCATION: classpath:/application.yml
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          mvn --batch-mode --no-transfer-progress surefire:test
+          mvn --batch-mode --no-transfer-progress -Psecurity-scan clean verify
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($report in @('bom.json', 'bom.xml', 'dependency-tree.txt', 'dependency-check-report.json', 'dependency-check-report.html')) {
+            if (-not (Test-Path "target/$report")) { throw "Missing required security evidence: $report" }
+          }
+
+      - name: Preserve scan evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-security-evidence
+          path: |
+            target/bom.*
+            target/dependency-tree.txt
+            target/dependency-check-report.*
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Package Windows installer with bundled runtime
         run: |
@@ -78,7 +89,7 @@ jobs:
             --app-version "$env:RELEASE_VERSION" `
             --input package-input `
             --main-jar application.jar `
-            --main-class org.springframework.boot.loader.JarLauncher `
+            --main-class org.springframework.boot.loader.launch.JarLauncher `
             --dest dist `
             --java-options '-Dserver.address=127.0.0.1' `
             --win-console `
@@ -88,19 +99,25 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Only distribute the blank-key template, never the root configuration or output data.
           Copy-Item src/main/resources/application.yml dist/application.yml
+          Copy-Item target/bom.json, target/bom.xml, target/dependency-tree.txt, target/dependency-check-report.json, target/dependency-check-report.html dist/
           if (-not (Get-ChildItem dist -Filter '*.exe')) { throw 'Installer was not created.' }
 
       - name: Create release ZIP
         run: |
-          Compress-Archive -Path dist/*.exe, dist/application.yml `
+          Compress-Archive -Path dist/*.exe, dist/application.yml, dist/bom.*, dist/dependency-tree.txt, dist/dependency-check-report.* `
             -DestinationPath "dist/AcrobatSignBulkOperations-$env:RELEASE_VERSION-windows-x64.zip" `
             -ErrorAction Stop
+          $zip = Get-Item "dist/AcrobatSignBulkOperations-$env:RELEASE_VERSION-windows-x64.zip"
+          "$((Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLower())  $($zip.Name)" |
+            Set-Content -Encoding ascii "dist/$($zip.Name).sha256"
 
       - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-release
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -124,7 +141,7 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
-          gh release create "v${RELEASE_VERSION}" dist/*.zip \
+          gh release create "v${RELEASE_VERSION}" dist/*.zip dist/*.sha256 \
             --target "$RELEASE_COMMIT" \
             --title "Acrobat Sign Bulk Operations ${RELEASE_VERSION}" \
             --notes "Download and extract the Windows x64 ZIP containing the installer with a bundled Java runtime and application.yml. Run the installer, configure your integration key and baseUrl in the extracted application.yml, and launch the installed executable from that configuration folder. See the README at this release tag for full instructions. The installer is unsigned."

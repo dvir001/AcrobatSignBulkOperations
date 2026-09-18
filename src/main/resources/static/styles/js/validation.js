@@ -1,3 +1,14 @@
+$.ajaxPrefilter(function (options, originalOptions, xhr) {
+    var target = new URL(options.url, window.location.href);
+    if (target.origin === window.location.origin && !/^(GET|HEAD|OPTIONS|TRACE)$/i.test(options.type)) {
+        var token = document.querySelector('meta[name="_csrf"]');
+        var header = document.querySelector('meta[name="_csrf_header"]');
+        if (token && header) {
+            xhr.setRequestHeader(header.content, token.content);
+        }
+    }
+});
+
 function navigateToPage(userIds, startDate, beforeDate, size, pageNumber) {
 			    var form = document.createElement('form');
 			    form.method = 'post';
@@ -16,6 +27,8 @@ function navigateToPage(userIds, startDate, beforeDate, size, pageNumber) {
 			    addInput(form, 'beforeDate', beforeDate);
 			    addInput(form, 'size', size);
 			    addInput(form, 'page', pageNumber);
+                addInput(form, document.querySelector('meta[name="_csrf_parameter"]').content,
+                    document.querySelector('meta[name="_csrf"]').content);
 			
 			    document.body.appendChild(form);
 			    form.submit();

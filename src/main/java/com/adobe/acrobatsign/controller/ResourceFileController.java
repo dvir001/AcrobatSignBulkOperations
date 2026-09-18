@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 import com.adobe.acrobatsign.util.Constants;
 
-import springfox.documentation.annotations.ApiIgnore;
+import io.swagger.v3.oas.annotations.Hidden;
 
 @Controller
 public class ResourceFileController {
@@ -15,7 +15,7 @@ public class ResourceFileController {
 	 *
 	 * @return the string
 	 */
-	@ApiIgnore
+	@Hidden
 	@GetMapping(Constants.SEND_FOR_SIGNATURE_ENDPOINT)
 	public String getAgreementPage() {
 		return Constants.SEND_FORM_HTML;
@@ -31,7 +31,7 @@ public class ResourceFileController {
 	 *
 	 * @return the string
 	 */
-	@ApiIgnore
+	@Hidden
 	@GetMapping(Constants.MAIN_PAGE_ENDPOINT)
 	public String sendContractMethod() {
 		return Constants.INDEX_HTML;
