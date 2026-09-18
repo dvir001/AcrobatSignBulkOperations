@@ -5,8 +5,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -359,7 +357,7 @@ public class AdobeSignController {
 	}
 
 	@PostMapping(Constants.GET_MULTI_USER_AGREEMENTS)
-	public String getMultiUserAgreements(Model model, @RequestBody String userIdsJson, @RequestParam String startDate,
+	public String getMultiUserAgreements(Model model, @RequestParam("userIds") String userIdsJson, @RequestParam String startDate,
 			@RequestParam String beforeDate, @RequestParam("page") Optional<Integer> page,
 			@RequestParam("size") String nextIndexMap) {
 
@@ -369,18 +367,10 @@ public class AdobeSignController {
 		ObjectMapper userMapper = new ObjectMapper();
 		List<String> userEmail = null;
 		final ObjectMapper mapper = new ObjectMapper();
-		// URL-decode the userIds parameter
 		try {
-			String decodedUserIds = URLDecoder.decode(userIdsJson, "UTF-8").replace("userIds=", "").replaceAll("\\s+",
-					"");
-			// decodedUserIds = "[" + decodedUserIds + "]";
-
 			nextIndexMapVal = mapper.readValue(nextIndexMap, HashMap.class);
-			userEmail = userMapper.readValue(decodedUserIds, List.class);
+			userEmail = userMapper.readValue(userIdsJson, List.class);
 		} catch (final JsonProcessingException e) {
-			e.printStackTrace();
-		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 

@@ -15,28 +15,30 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.adobe.acrobatsign.model.MultiUserAgreementDetails;
 import com.adobe.acrobatsign.model.MultiUserWidgetDetails;
 import com.adobe.acrobatsign.model.UserGroups;
 import com.adobe.acrobatsign.model.UserWorkflows;
@@ -58,17 +60,17 @@ class AccessSecurityTests {
     @Autowired
     MockMvc mvc;
 
-    @MockBean
+    @MockitoBean
     AdobeSignService adobe;
-    @MockBean
+    @MockitoBean
     GroupService groups;
-    @MockBean
+    @MockitoBean
     LibraryTemplateService templates;
-    @MockBean
+    @MockitoBean
     UserService users;
-    @MockBean
+    @MockitoBean
     WebformService webforms;
-    @MockBean
+    @MockitoBean
     WorkflowService workflows;
 
     @ParameterizedTest
@@ -79,7 +81,7 @@ class AccessSecurityTests {
             "/styles/css/homeLayout.css", "/actuator", "/v3/api-docs", "/swagger-ui/index.html" })
     void readsRequireAnAuthorizedOperator(String path) throws Exception {
         mvc.perform(get(path)).andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrlPattern("**/login"));
+                .andExpect(redirectedUrl("/login"));
         mvc.perform(get(path).with(user("reader").roles("USER"))).andExpect(status().isForbidden());
         verifyNoAdobeCalls();
     }
@@ -94,7 +96,7 @@ class AccessSecurityTests {
             "/manageMultiuserAgreements" })
     void allMutationsRequireAuthenticationRoleAndCsrf(String path) throws Exception {
         mvc.perform(post(path).with(csrf())).andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrlPattern("**/login"));
+                .andExpect(redirectedUrl("/login"));
         mvc.perform(post(path).with(user("reader").roles("USER")).with(csrf()))
                 .andExpect(status().isForbidden());
         mvc.perform(post(path).with(user("operator").roles("OPERATOR")))
@@ -188,6 +190,35 @@ class AccessSecurityTests {
         verify(webforms).getWebforms(List.of("user@example.test"));
     }
 
+    @Test
+    void paginationBindsOnlyUserIdsAndPreservesPlusSignsWithCsrf() throws Exception {
+        String email = "operator+agreements@example.test";
+        MultiUserAgreementDetails result = new MultiUserAgreementDetails();
+        result.setAgreementList(List.of());
+        result.setTotalAgreements(0L);
+        result.setUserEmails(List.of(email));
+        result.setNextIndexMap(Map.of(email, 0L));
+        when(adobe.searchMultiUserAgreements(List.of(email), "2026-01-01", "2026-09-18",
+                "ABC", Map.of(email, 0), 1)).thenReturn(result);
+
+        MvcResult page = mvc.perform(get("/widgets").with(user("operator").roles("OPERATOR")))
+                .andExpect(status().isOk()).andReturn();
+        var token = Pattern.compile("<meta name=\"_csrf\" content=\"([^\"]+)\"")
+                .matcher(page.getResponse().getContentAsString());
+        assertThat(token.find()).isTrue();
+        mvc.perform(post("/multiuseragreements")
+                .session((MockHttpSession) page.getRequest().getSession(false))
+                .with(user("operator").roles("OPERATOR"))
+                .formField("_csrf", token.group(1))
+                .formField("userIds", "[\"" + email + "\"]")
+                .formField("startDate", "2026-01-01")
+                .formField("beforeDate", "2026-09-18")
+                .formField("size", "{\"" + email + "\":0}")
+                .formField("page", "1")).andExpect(status().isOk());
+        verify(adobe).searchMultiUserAgreements(List.of(email), "2026-01-01", "2026-09-18",
+                "ABC", Map.of(email, 0), 1);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = { "/send", "/sendsignature", "/widgets", "/libraryTemplateSearch", "/workflows" })
     void renderedUploadAndWorkflowFormsContainCsrf(String path) throws Exception {
@@ -203,6 +234,13 @@ class AccessSecurityTests {
         try (var paths = Files.list(Path.of("src/main/resources/templates"))) {
             for (Path path : paths.filter(file -> file.toString().endsWith(".html")).toList()) {
                 String html = Files.readString(path);
+                assertThat(html).as(path.toString()).doesNotContain("bootstrap.min.js");
+                var externalScripts = Pattern.compile("(?is)<script\\b[^>]*\\bsrc=\"https://[^>]*>")
+                        .matcher(html);
+                while (externalScripts.find()) {
+                    assertThat(externalScripts.group()).as(path.toString())
+                            .contains("integrity=\"sha384-", "crossorigin=\"anonymous\"");
+                }
                 var forms = Pattern.compile("(?is)<form\\b[^>]*>").matcher(html);
                 while (forms.find()) {
                     String form = forms.group();
@@ -212,6 +250,10 @@ class AccessSecurityTests {
                 }
                 if (html.contains("validation.js")) {
                     assertThat(html).as(path.toString()).contains("th:replace=\"~{csrf :: meta}\"");
+                    assertThat(html.indexOf("jquery.min.js")).as(path.toString()).isNotNegative()
+                            .isLessThan(html.indexOf("validation.js"));
+                    assertThat(html.indexOf("jquery.min.js")).isEqualTo(html.lastIndexOf("jquery.min.js"));
+                    assertThat(html.indexOf("validation.js")).isEqualTo(html.lastIndexOf("validation.js"));
                 }
             }
         }

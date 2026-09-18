@@ -82,7 +82,7 @@ The delete operation is available to delete the documents associated with agreem
 ## Technology stack
   <ul>
      <li>Java 17 or newer</li>
-     <li>Spring Boot 3.5</li>
+     <li>Spring Boot 4 (exact dependency versions are pinned in pom.xml)</li>
   </ul>
 
 # Instructions to run the application
@@ -183,9 +183,10 @@ Authenticated API documentation is available at http://localhost:8090/swagger-ui
 - Authentication and operator authorization are required for application operations. Browser mutations require a CSRF token; API clients must authenticate and supply a token rather than disabling CSRF.
 - For all launch modes, set `APP_USERNAME` (default `operator`) and `APP_PASSWORD`, or use `spring.security.user.name` and `spring.security.user.password` in your private external configuration. With no password configured, the console prints a fresh random password for that run. Do not reuse the Adobe integration key as the local login password.
 - Uploads use a fresh private temporary directory and a server-selected filename, never a client-supplied filesystem path. Temporary documents are removed after the Adobe request, including failures.
-- Configuration backups, generated binaries, and downloaded agreement data are no longer tracked. Existing local files are preserved, but **previously committed integration keys must be revoked and replaced**: deleting a file does not remove it from Git history. Review historical output data and old release assets separately; history has not been rewritten.
+- Configuration backups, generated binaries, and downloaded agreement data are no longer tracked. Local configuration backups and downloaded agreements are preserved, but **previously committed integration keys must be revoked and replaced**: deleting a file does not remove it from Git history. Clean builds replace the contents of `target/`. Review historical output data and old release assets separately; history has not been rewritten.
 - Build release artifacts from reviewed source instead of using old checked-in JARs. `target/dependency-tree.txt` contains the resolved dependency inventory; `target/bom.json` and `target/bom.xml` contain the CycloneDX SBOM, including test dependencies.
-- Run `mvn --batch-mode --no-transfer-progress -Psecurity-scan clean verify` to build and scan resolved dependencies with OWASP Dependency-Check. Set `NVD_API_KEY` for reliable NVD access. The scan fails on reported vulnerabilities or scanner errors; investigate findings and upgrade dependencies rather than bypassing the gate. Advisory scanning is not malware detection and does not prove an artifact is safe.
+- Browser scripts are separately pinned to jQuery 3.5.1 and FileSaver.js 2.0.5 with SHA-384 subresource-integrity checks. Unused Bootstrap JavaScript has been removed. These CDN scripts and external stylesheets are not included in the Maven SBOM and require separate review when updated.
+- Run `mvn --batch-mode --no-transfer-progress -Psecurity-scan clean verify` to build and scan resolved dependencies with OWASP Dependency-Check. Set `NVD_API_KEY` for reliable NVD access. The scan also needs access to its advisory databases; a database download failure is not a clean scan. The scan fails on reported vulnerabilities or scanner errors; investigate findings and upgrade dependencies rather than bypassing the gate. The Maven inventory does not cover externally hosted browser assets. Advisory scanning is not malware detection and does not prove an artifact is safe.
 
 # Future automation opportunities
 <ul>
