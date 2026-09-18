@@ -2,14 +2,11 @@
 <html>
 
 <head>
+    <th:block th:replace="~{csrf :: meta}"></th:block>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-  <script type="text/javascript" th:src="@{/styles/js/validation.js}"></script>
-  <script type="text/javascript" th:src="@{/styles/js/action.js}"></script>
   <link th:href="@{/styles/css/homeLayout.css}" rel="stylesheet" />
 </head>
 
@@ -174,10 +171,9 @@
     </div>
 
   <!-- jQuery library -->
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script>
 	
 	<!-- Latest compiled JavaScript -->
-	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 	<script type="text/javascript" th:src="@{/styles/js/validation.js}"></script>
 	<script type="text/javascript" th:src="@{/styles/js/action.js}"></script>
 </body>

@@ -1,1 +1,7 @@
 /application.yml
+/application.yml.bak
+/target/
+/output/
+/.scannerwork/
+/package-input/
+/dist/

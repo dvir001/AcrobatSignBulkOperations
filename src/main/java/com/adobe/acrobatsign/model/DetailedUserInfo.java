@@ -9,7 +9,7 @@ import com.google.gson.annotations.SerializedName;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public class DetailedUserInfo {
 	public enum AccountTypeEnum {
@@ -200,7 +200,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return accountType
 	 **/
-	@ApiModelProperty(value = "Type of account to which the user belongs (null if no account)")
+	@Schema(description = "Type of account to which the user belongs (null if no account)")
 	public AccountTypeEnum getAccountType() {
 		return accountType;
 	}
@@ -210,7 +210,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return company
 	 **/
-	@ApiModelProperty(value = "The name of company of the user")
+	@Schema(description = "The name of company of the user")
 	public String getCompany() {
 		return company;
 	}
@@ -224,7 +224,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return email
 	 **/
-	@ApiModelProperty(value = "The email address of the user")
+	@Schema(description = "The email address of the user")
 	public String getEmail() {
 		return email;
 	}
@@ -234,7 +234,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return firstName
 	 **/
-	@ApiModelProperty(value = "The first name of the user")
+	@Schema(description = "The first name of the user")
 	public String getFirstName() {
 		return firstName;
 	}
@@ -244,7 +244,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return id
 	 **/
-	@ApiModelProperty(value = "A unique identifier of the user resource for REST APIs as issued by Sign.")
+	@Schema(description = "A unique identifier of the user resource for REST APIs as issued by Sign.")
 	public String getId() {
 		return id;
 	}
@@ -254,7 +254,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return initials
 	 **/
-	@ApiModelProperty(value = "The initials of the user")
+	@Schema(description = "The initials of the user")
 	public String getInitials() {
 		return initials;
 	}
@@ -268,7 +268,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return lastName
 	 **/
-	@ApiModelProperty(value = "The last name of the user")
+	@Schema(description = "The last name of the user")
 	public String getLastName() {
 		return lastName;
 	}
@@ -278,7 +278,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return locale
 	 **/
-	@ApiModelProperty(value = "The UI locale of the user")
+	@Schema(description = "The UI locale of the user")
 	public String getLocale() {
 		return locale;
 	}
@@ -288,7 +288,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return phone
 	 **/
-	@ApiModelProperty(value = "The phone number of the user")
+	@Schema(description = "The phone number of the user")
 	public String getPhone() {
 		return phone;
 	}
@@ -298,7 +298,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return status
 	 **/
-	@ApiModelProperty(value = "Status of the user")
+	@Schema(description = "Status of the user")
 	public StatusEnum getStatus() {
 		return status;
 	}
@@ -308,7 +308,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return title
 	 **/
-	@ApiModelProperty(value = "The job title of the user")
+	@Schema(description = "The job title of the user")
 	public String getTitle() {
 		return title;
 	}
@@ -339,7 +339,7 @@ public class DetailedUserInfo {
 	 *
 	 * @return isAccountAdmin
 	 **/
-	@ApiModelProperty(value = "True if the user is account admin")
+	@Schema(description = "True if the user is account admin")
 	public Boolean isIsAccountAdmin() {
 		return isAccountAdmin;
 	}
