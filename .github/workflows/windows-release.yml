@@ -24,6 +24,7 @@ jobs:
         shell: pwsh
     env:
       RELEASE_VERSION: ${{ inputs.version }}
+      DEPENDENCY_CHECK_DATA_DIRECTORY: ${{ runner.temp }}/dependency-check-data
     steps:
       - name: Validate installer version
         run: |
@@ -44,6 +45,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: maven
+          cache-dependency-path: pom.xml
 
       - name: Require vulnerability database credentials
         env:
@@ -53,12 +56,44 @@ jobs:
             throw 'Configure the NVD_API_KEY repository secret; releases require a successful vulnerability scan.'
           }
 
+      - name: Read vulnerability database cache version
+        id: dependency-check-version
+        run: |
+          [xml]$pom = Get-Content pom.xml -Raw
+          $version = $pom.project.properties.'dependency-check.version'
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Missing Dependency-Check version.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore vulnerability database
+        id: dependency-check-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.DEPENDENCY_CHECK_DATA_DIRECTORY }}
+          key: dependency-check-${{ runner.os }}-${{ steps.dependency-check-version.outputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            dependency-check-${{ runner.os }}-${{ steps.dependency-check-version.outputs.version }}-
+
+      - name: Update vulnerability database (first download can take an hour)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          mvn --batch-mode --no-transfer-progress -Psecurity-scan org.owasp:dependency-check-maven:update-only `
+            "-DdataDirectory=$env:DEPENDENCY_CHECK_DATA_DIRECTORY" "-DnvdValidForHours=0"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Cache successfully updated vulnerability database before scanning
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.DEPENDENCY_CHECK_DATA_DIRECTORY }}
+          key: ${{ steps.dependency-check-cache.outputs.cache-primary-key }}
+
       - name: Rebuild, test, inventory, and scan all resolved dependencies
         env:
           SPRING_CONFIG_LOCATION: classpath:/application.yml
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          mvn --batch-mode --no-transfer-progress -Psecurity-scan clean verify
+          mvn --batch-mode --no-transfer-progress -Psecurity-scan clean verify `
+            "-DdataDirectory=$env:DEPENDENCY_CHECK_DATA_DIRECTORY"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           foreach ($report in @('bom.json', 'bom.xml', 'dependency-tree.txt', 'dependency-check-report.json', 'dependency-check-report.html')) {
             if (-not (Test-Path "target/$report")) { throw "Missing required security evidence: $report" }
